@@ -88,6 +88,7 @@ class TF_Grid(Model):
 
             self.effect_inds = np.nonzero(self.A)
 
+    #TODO: returns keras model....
     def build_tf_model(self):
         if not hasattr(self, 'tf_model'):
             self.tf_model = self.tf_grid_model(self)
@@ -129,9 +130,22 @@ if __name__ == '__main__':
     grid = TF_Grid()
     grid.neighbor_rule = neighbor_rule
     grid.tf_grid_model = TF_Grid_Model_v1
+    grid.hidden_dim = 1
+    grid.time_horizon = 10
 
-    inputs = {"grid_obs": tf.constant([[0],[1],[2],[3],[4],[5],[6],[7],[8]], dtype=tf.float32)}
+    inputs = {"grid_obs": tf.constant([
+        [[0],[1],[2],[3],[4],[5],[6],[7],[8]],
+        [[10],[11],[12],[13],[14],[15],[16],[17],[18]],
+        [[20],[21],[22],[23],[24],[25],[26],[27],[28]]], dtype=tf.float32)}
+
+    #with tf.GradientTape() as grad_tape:
+    #    pred = grid.predict(inputs)
+    #    loss = tf.linalg.norm(pred)
+    #gradients = grad_tape.gradient(loss, grid.tf_grid_model.trainable_variables)
+
+    #print(list(grid.tf_grid_model.trainable_variables))
 
     pred = grid.predict(inputs)
-
-    print(pred)
+    print(pred[0])
+    print(pred[1])
+    print(pred[2])

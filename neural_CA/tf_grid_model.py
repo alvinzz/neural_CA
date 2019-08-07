@@ -27,6 +27,7 @@ class TF_Grid_Model_v1(tf.keras.Model, Parameter):
         self.grid = grid
 
         self.n_cells = self.grid.n_cells
+        self.n_effects = len(self.grid.effect_inds[0])
         self.effect_inds = self.grid.effect_inds
 
         self.obs_dim = self.grid.obs_dim
@@ -36,9 +37,10 @@ class TF_Grid_Model_v1(tf.keras.Model, Parameter):
         self.time_horizon = self.grid.time_horizon
 
         # build Layers and start_hidden_state Variable
+        self.trainable_variables
         self.build_MLPs()
         if self.hidden_dim:
-            self.start_hidden_state = tf.Variable((self.n_cells, self.hidden_dim), dtype=tf.float32)        
+            self.start_hidden_state = tf.Variable(tf.zeros((self.n_cells, self.hidden_dim)), dtype=tf.float32)
 
     def update_paramters(self):
         self.params = {
@@ -109,15 +111,19 @@ class TF_Grid_Model_v1(tf.keras.Model, Parameter):
     def call(self, inputs):
         preds = []
 
+        batch_size = tf.shape(inputs["grid_obs"])[0]
+
         if self.hidden_dim:
-            cells = tf.concat([inputs["grid_obs"], tf.tile(self.start_hidden_state)], -1)
+            batch_cells = tf.concat([inputs["grid_obs"], tf.tile(tf.expand_dims(self.start_hidden_state, 0), [batch_size, 1, 1])], -1)
         else:
-            cells = inputs["grid_obs"]
-       
+            batch_cells = inputs["grid_obs"]
+        cells = tf.reshape(batch_cells, [batch_size * self.n_cells, self.state_dim])
+
         for t in range(self.time_horizon):
-            effect_matrix = tf.nn.embedding_lookup(cells, self.effect_inds)
-            effect_cells = effect_matrix[0]
-            effect_neighbors = effect_matrix[1]
+            effect_matrix = tf.stack(list(
+                map(lambda cells: tf.nn.embedding_lookup(cells, self.effect_inds), tf.unstack(batch_cells))))
+            effect_cells = tf.reshape(effect_matrix[:, 0], [batch_size * self.n_effects, self.state_dim])
+            effect_neighbors = tf.reshape(effect_matrix[:, 1], [batch_size * self.n_effects, self.state_dim])
 
             if self.effect_dotp_dim:
                  effect_dotp_cells = self.effect_dotp_cell_MLP(effect_cells)
@@ -129,7 +135,10 @@ class TF_Grid_Model_v1(tf.keras.Model, Parameter):
                      [effect_cells, effect_neighbors], -1)
 
             effects = self.effect_MLP(effect_in)
-            tot_effects = tf.math.segment_sum(effects, self.effect_inds[0])
+            batch_effects = tf.reshape(effects, [batch_size, self.n_effects, self.effect_dim])
+            stack_tot_effects = tf.stack(list(
+                map(lambda effects: tf.math.segment_sum(effects, self.effect_inds[0]), tf.unstack(batch_effects))))
+            tot_effects = tf.reshape(stack_tot_effects, [batch_size * self.n_cells, self.effect_dim])
 
             if self.apply_dotp_dim:
                 apply_dotp_cells = self.apply_dotp_cell_MLP(cells)
@@ -140,10 +149,12 @@ class TF_Grid_Model_v1(tf.keras.Model, Parameter):
                 apply_in = tf.concat(
                     [cells, tot_effects], -1)
 
-            cells_pred = self.apply_MLP(apply_in)
+            cells = self.apply_MLP(apply_in)
 
-            preds.append(cells_pred)
+            batch_cells = tf.reshape(cells, [batch_size, self.n_cells, self.state_dim])
 
-        preds = tf.stack(preds)
+            preds.append(batch_cells[:, :, :self.obs_dim])
+
+        preds = tf.stack(preds, 1)
 
         return preds
