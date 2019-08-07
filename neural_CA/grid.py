@@ -53,9 +53,7 @@ class TF_Grid(Model):
 
         self.neighbor_rule = None
 
-        self.tf_grid_model = None 
-
-        self.cell_states = tf.Variable(shape=(self.state_dim, self.n_cells))
+        self.tf_grid_model = None
 
     def update_parameters(self):
         self.params = {
@@ -64,7 +62,7 @@ class TF_Grid(Model):
 
             "state_dim": self.state_dim,
             "n_cells": self.n_cells,
-            
+
             "neighbor_rule": self.neighbor_rule,
 
             "tf_grid_model": self.tf_grid_model,
@@ -73,32 +71,29 @@ class TF_Grid(Model):
     # calculates adjacency matrix for the grid based on the Grid.neighbor_rule
     def get_A(self):
         self.A = np.zeros((self.n_cells, self.n_cells), dtype=np.int32)
-        
+
         for i in range(self.n_cells):
             for j in range(self.n_cells):
                 if self.neighbor_rule(i, j):
                     self.A[i, j] = 1
-        
+
         self.interaction_inds = np.nonzero(self.A)
 
     def build_tf_model(self):
         # tf_model should be of type tf.keras.Model
         if not hasattr(self, "tf_model"):
-            self.tf_model = TF_Grid_Model(self)
+            self.tf_model = self.tf_grid_model(self)
 
     def predict(self, inputs):
         if not hasattr(self, 'A'):
             self.get_A()
-        
+
         if not hasattr(self, 'tf_model'):
             self.build_tf_model()
-        
-        pred = self.tf_model(inputs["feature"])
-        
-        return pred
 
-    def set_cell_states(self, cell_states):
-        tf.assign(self.cell_states, cell_states)
+        pred = self.tf_model(inputs["feature"])
+
+        return pred
 
     def visualize(self):
         raise NotImplementedError
@@ -120,15 +115,14 @@ if __name__ == '__main__':
             7: [4, 6, 8],
             8: [5, 7],
         }
-
     def neighbor_rule(i, j):
         return j in d[i]
 
-    grid = TF_Grid
+    grid = TF_Grid()
     grid.neighbor_rule = neighbor_rule
     grid.tf_grid_model = TF_Grid_Model_v1
 
-    inputs = {"feature": tf.constant([1,0,1,0,1,0,1,0,1], dtype=tf.float32)}
+    inputs = {"feature": tf.constant([[0],[1],[2],[3],[4],[5],[6],[7],[8]], dtype=tf.float32)}
 
     pred = grid.predict(inputs)
 
