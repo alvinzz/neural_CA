@@ -48,8 +48,12 @@ class TF_Grid(Model):
     param_name = "TF_Grid"
 
     def __init__(self):
-        self.state_dim = 1
         self.n_cells = 9
+
+        self.obs_dim = 1
+        self.hidden_dim = 0
+
+        self.time_horizon = 1
 
         self.neighbor_rule = None
 
@@ -60,8 +64,12 @@ class TF_Grid(Model):
             "param_path": Experiment.param_path,
             "param_name": Experiment.param_name,
 
-            "state_dim": self.state_dim,
             "n_cells": self.n_cells,
+
+            "obs_dim": self.obs_dim,
+            "hidden_dim": self.hidden_dim,
+
+            "time_horizon": self.time_horizon,
 
             "neighbor_rule": self.neighbor_rule,
 
@@ -70,18 +78,18 @@ class TF_Grid(Model):
 
     # calculates adjacency matrix for the grid based on the Grid.neighbor_rule
     def get_A(self):
-        self.A = np.zeros((self.n_cells, self.n_cells), dtype=np.int32)
+        if not hasattr(self, 'A'):
+            self.A = np.zeros((self.n_cells, self.n_cells), dtype=np.int32)
 
-        for i in range(self.n_cells):
-            for j in range(self.n_cells):
-                if self.neighbor_rule(i, j):
-                    self.A[i, j] = 1
+            for i in range(self.n_cells):
+                for j in range(self.n_cells):
+                    if self.neighbor_rule(i, j):
+                        self.A[i, j] = 1
 
-        self.interaction_inds = np.nonzero(self.A)
+            self.effect_inds = np.nonzero(self.A)
 
     def build_tf_model(self):
-        # tf_model should be of type tf.keras.Model
-        if not hasattr(self, "tf_model"):
+        if not hasattr(self, 'tf_model'):
             self.tf_model = self.tf_grid_model(self)
 
     def predict(self, inputs):
@@ -91,7 +99,7 @@ class TF_Grid(Model):
         if not hasattr(self, 'tf_model'):
             self.build_tf_model()
 
-        pred = self.tf_model(inputs["feature"])
+        pred = self.tf_model(inputs)
 
         return pred
 
@@ -122,7 +130,7 @@ if __name__ == '__main__':
     grid.neighbor_rule = neighbor_rule
     grid.tf_grid_model = TF_Grid_Model_v1
 
-    inputs = {"feature": tf.constant([[0],[1],[2],[3],[4],[5],[6],[7],[8]], dtype=tf.float32)}
+    inputs = {"grid_obs": tf.constant([[0],[1],[2],[3],[4],[5],[6],[7],[8]], dtype=tf.float32)}
 
     pred = grid.predict(inputs)
 
