@@ -42,7 +42,7 @@ class Grid(object):
     def visualize_n(self, n):
         pass
 
-def TF_Grid(Parameter):
+class TF_Grid(Parameter):
     def __init__(self):
         self.state_dim = 2
         self.n_cells = 9
@@ -59,23 +59,23 @@ def TF_Grid(Parameter):
             7: [4, 6, 8],
             8: [5, 7],
         }
-        for (cell, neighbors_list) in d:
+        for (cell, neighbors_list) in d.items():
             for neighbor in neighbors_list:
                 self.A[cell, neighbor] = 1
         self.interaction_inds = np.nonzero(self.A)
 
         # self.cell_states = tf.Variable(shape=(self.state_dim, self.n_cells))
-        self.cell_states = tf.constant([
+        self.cell_states = tf.reshape(tf.constant([
             [1, 0, 1],
             [0, 1, 0],
             [1, 0, 1],
-        ], dtype=tf.float32)
+        ], dtype=tf.float32), [-1])
 
     def update(self):
         # raise NotImplementedError
         interaction_matrix = tf.nn.embedding_lookup(self.cell_states, self.interaction_inds)
-        cells = self.interaction_matrix[0]
-        neighbors = self.interaction_matrix[1]
+        cells = interaction_matrix[0]
+        neighbors = interaction_matrix[1]
         # effects = MLP(tf.concatenate([cells, neighbors, MLP(cells)*MLP(neighbors)], axis=-1))
         effects = neighbors
         tot_effects = tf.math.segment_sum(effects, self.interaction_inds[0])
@@ -84,10 +84,10 @@ def TF_Grid(Parameter):
 
 if __name__ == '__main__':
     grid = TF_Grid()
-    print(grid.cell_states)
+    print(tf.reshape(grid.cell_states, [3, 3]))
     grid.update()
-    print(grid.cell_states)
+    print(tf.reshape(grid.cell_states, [3, 3]))
     grid.update()
-    print(grid.cell_states)
+    print(tf.reshape(grid.cell_states, [3, 3]))
     grid.update()
-    print(grid.cell_states)
+    print(tf.reshape(grid.cell_states, [3, 3]))
