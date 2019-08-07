@@ -42,13 +42,73 @@ class Grid(object):
     def visualize_n(self, n):
         pass
 
-class TF_Grid(Parameter):
+class TF_Grid(Model):
+    param_path = "neural_CA/grid"
+    param_name = "TF_Grid"
+
     def __init__(self):
-        self.state_dim = 2
+        self.state_dim = 1
         self.n_cells = 9
 
+        self.neighbor_rule = None
+
+        self.tf_grid_model = None 
+
+        self.cell_states = tf.Variable(shape=(self.state_dim, self.n_cells))
+
+    def update_parameters(self):
+        self.params = {
+            "param_path": Experiment.param_path,
+            "param_name": Experiment.param_name,
+
+            "state_dim": self.state_dim,
+            "n_cells": self.n_cells,
+            
+            "neighbor_rule": self.neighbor_rule,
+
+            "tf_grid_model": self.tf_grid_model,
+        }
+
+    # calculates adjacency matrix for the grid based on the Grid.neighbor_rule
+    def get_A(self):
         self.A = np.zeros((self.n_cells, self.n_cells), dtype=np.int32)
-        d = {
+        
+        for i in range(self.n_cells):
+            for j in range(self.n_cells):
+                if self.neighbor_rule(i, j):
+                    self.A[i, j] = 1
+        
+        self.interaction_inds = np.nonzero(self.A)
+
+    def build_tf_model(self):
+        # tf_model should be of type tf.keras.Model
+        if not hasattr(self, "tf_model"):
+            self.tf_model = TF_Grid_Model(self)
+
+    def predict(self, inputs):
+        if not hasattr(self, 'A'):
+            self.get_A()
+        
+        if not hasattr(self, 'tf_model'):
+            self.build_tf_model()
+        
+        pred = self.tf_model(inputs["feature"])
+        
+        return pred
+
+    def set_cell_states(self, cell_states):
+        tf.assign(self.cell_states, cell_states)
+
+    def visualize(self):
+        raise NotImplementedError
+
+    def visualize_n(self, n):
+        raise NotImplementedError
+
+if __name__ == '__main__':
+    from tf_grid_model import TF_Grid_Model_v1
+
+    d = {
             0: [1, 3],
             1: [0, 2, 4],
             2: [1, 5],
@@ -59,35 +119,16 @@ class TF_Grid(Parameter):
             7: [4, 6, 8],
             8: [5, 7],
         }
-        for (cell, neighbors_list) in d.items():
-            for neighbor in neighbors_list:
-                self.A[cell, neighbor] = 1
-        self.interaction_inds = np.nonzero(self.A)
 
-        # self.cell_states = tf.Variable(shape=(self.state_dim, self.n_cells))
-        self.cell_states = tf.reshape(tf.constant([
-            [1, 0, 1],
-            [0, 1, 0],
-            [1, 0, 1],
-        ], dtype=tf.float32), [-1])
+    def neighbor_rule(i, j):
+        return j in d[i]
 
-    def update(self):
-        # raise NotImplementedError
-        interaction_matrix = tf.nn.embedding_lookup(self.cell_states, self.interaction_inds)
-        cells = interaction_matrix[0]
-        neighbors = interaction_matrix[1]
-        # effects = MLP(tf.concatenate([cells, neighbors, MLP(cells)*MLP(neighbors)], axis=-1))
-        effects = neighbors
-        tot_effects = tf.math.segment_sum(effects, self.interaction_inds[0])
-        # self.cell_states = MLP(self.cell_states, tot_effects)
-        self.cell_states = tot_effects
+    grid = TF_Grid
+    grid.neighbor_rule = neighbor_rule
+    grid.tf_grid_model = TF_Grid_Model_v1
 
-if __name__ == '__main__':
-    grid = TF_Grid()
-    print(tf.reshape(grid.cell_states, [3, 3]))
-    grid.update()
-    print(tf.reshape(grid.cell_states, [3, 3]))
-    grid.update()
-    print(tf.reshape(grid.cell_states, [3, 3]))
-    grid.update()
-    print(tf.reshape(grid.cell_states, [3, 3]))
+    inputs = {"feature": tf.constant([1,0,1,0,1,0,1,0,1], dtype=tf.float32)}
+
+    pred = grid.predict(inputs)
+
+    print(pred)

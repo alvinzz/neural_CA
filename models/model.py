@@ -13,6 +13,6 @@ class Model(Parameter):
             "param_name": Model.param_name,
         }
 
-    def predict(self, input):
+    def predict(self, inputs):
         print("TODO: define predict method for Model")
         raise NotImplementedError

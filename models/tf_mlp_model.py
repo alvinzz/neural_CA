@@ -42,5 +42,5 @@ class TF_MLP_Model(Model):
 
             self.tf_model = tf.keras.Sequential(layers)
 
-    def predict(self, input):
-        return self.tf_model(input["feature"])
+    def predict(self, inputs):
+        return self.tf_model(inputs["feature"])
