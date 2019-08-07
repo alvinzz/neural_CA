@@ -4,6 +4,7 @@ import tensorflow as tf
 from cell import Cell
 
 from parameter import Parameter
+from models.model import Model
 
 class Grid(object):
     def __init__(self, n_cells):
