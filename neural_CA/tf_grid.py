@@ -145,6 +145,24 @@ class TF_Grid_v1(TF_Grid):
         }
 
     def build_tf_model(self, batch_size, time_horizon):
+        """
+        pseudocode:
+        for cell in cells:
+            # calculate total effect of neighbors on cell
+            tot_effect = 0
+            for neighbor in get_neighbors(cell):
+                cell_effect_transform = MLP(cell.state)
+                neighbor_effect_transform = MLP(neighbor.state)
+                effect_dotp = cell_effect_transform (*) neighbor_effect_transform # (*) denotes elementwise multiplication
+                effect = MLP(cell.state, neighbor.state, effect_dotp)
+                tot_effect += effect
+
+            # apply total effect to cell
+            apply_cell_transform = MLP(cell.state)
+            apply_effect_transform = MLP(tot_effect)
+            apply_dotp = apply_cell_transform (*) apply_effect_transform
+            cell.state = MLP(cell.state, tot_effect, apply_dotp)
+        """
         self.get_A()
 
         if not hasattr(self, "tf_model"):
@@ -169,10 +187,10 @@ class TF_Grid_v1(TF_Grid):
                 effect_neighbors = tf.reshape(effect_matrix[:, 1], [batch_size * self.n_effects, self.state_dim])
 
                 if self.effect_dotp_dim:
-                     effect_dotp_cells = self.effect_dotp_cell_MLP(effect_cells)
-                     effect_dotp_neighbors = self.effect_dotp_neighbor_MLP(effect_neighbors)
+                     cell_effect_transform = self.cell_effect_transform_MLP(effect_cells)
+                     neighbor_effect_transform = self.neighbor_effect_transform_MLP(effect_neighbors)
                      effect_in = tf.concat(
-                         [effect_cells, effect_neighbors, effect_dotp_cells * effect_dotp_neighbors], -1)
+                         [effect_cells, effect_neighbors, cell_effect_transform * neighbor_effect_transform], -1)
                 else:
                      effect_in = tf.concat(
                          [effect_cells, effect_neighbors], -1)
@@ -184,17 +202,17 @@ class TF_Grid_v1(TF_Grid):
                 tot_effects = tf.reshape(stack_tot_effects, [batch_size * self.n_cells, self.effect_dim])
 
                 if self.apply_dotp_dim:
-                    apply_dotp_cells = self.apply_dotp_cell_MLP(cells)
-                    apply_dotp_effects = self.apply_dotp_effect_MLP(tot_effects)
+                    cell_apply_transform = self.cell_apply_transform_MLP(cells)
+                    effect_apply_transform = self.effect_apply_transform_MLP(tot_effects)
                     apply_in = tf.concat(
-                        [cells, tot_effects, apply_dotp_cells * apply_dotp_effects], -1)
+                        [cells, tot_effects, cell_apply_transform * effect_apply_transform], -1)
                 else:
                     apply_in = tf.concat(
                         [cells, tot_effects], -1)
 
                 cells = self.apply_MLP(apply_in)
-
                 batch_cells = tf.reshape(cells, [batch_size, self.n_cells, self.state_dim])
+
                 preds.append(batch_cells[:, :, :self.obs_dim])
 
             preds = tf.stack(preds, 1)
@@ -203,10 +221,10 @@ class TF_Grid_v1(TF_Grid):
 
     def build_MLPs(self):
         if self.effect_dotp_dim:
-            self.effect_dotp_cell_MLP = self.create_MLP(
+            self.cell_effect_transform_MLP = self.create_MLP(
                 self.state_dim, self.effect_dotp_dim,
                 self.effect_dotp_MLP_hidden_sizes, self.activation)
-            self.effect_dotp_neighbor_MLP = self.create_MLP(
+            self.neighbor_effect_transform_MLP = self.create_MLP(
                 self.state_dim, self.effect_dotp_dim,
                 self.effect_dotp_MLP_hidden_sizes, self.activation)
 
@@ -215,10 +233,10 @@ class TF_Grid_v1(TF_Grid):
             self.effect_MLP_hidden_sizes, self.activation)
 
         if self.apply_dotp_dim:
-            self.apply_dotp_cell_MLP = self.create_MLP(
+            self.cell_apply_transform_MLP = self.create_MLP(
                 self.state_dim, self.apply_dotp_dim,
                 self.apply_dotp_MLP_hidden_sizes, self.activation)
-            self.apply_dotp_effect_MLP = self.create_MLP(
+            self.effect_apply_transform_MLP = self.create_MLP(
                 self.effect_dim, self.apply_dotp_dim,
                 self.apply_dotp_MLP_hidden_sizes, self.activation)
 
