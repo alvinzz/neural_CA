@@ -33,10 +33,6 @@ class TF_Grid(Model):
         # for convenience
         self.state_dim = self.obs_dim + self.hidden_dim
 
-        # build tf_model
-        self.build_tf_model()
-
-
     def update_parameters(self):
         self.params = {
             "param_path": TF_Grid.param_path,
@@ -65,7 +61,7 @@ class TF_Grid(Model):
 
     # calculates adjacency matrix for the grid based on the Grid.neighbor_rule
     def get_A(self):
-        if not hasattr(self, 'A'):
+        if not hasattr(self, "A"):
             self.A = np.zeros((self.n_cells, self.n_cells), dtype=np.int32)
 
             for i in range(self.n_cells):
@@ -73,25 +69,21 @@ class TF_Grid(Model):
                     if self.neighbor_rule(i, j):
                         self.A[i, j] = 1
 
-            self.effect_inds = np.nonzero(self.A)
+            self.effect_inds = np.array(np.nonzero(self.A))
+            self.n_effects = self.effect_inds.shape[1]
 
-    #TODO: returns keras model....
-    def build_tf_model(self):
+    def build_tf_model(self, batch_size, time_horizon):
         self.get_A()
 
-        if not hasattr(self, 'tf_model'):
-            grid_obs = tf.keras.layers.Input(shape=[self.n_cells, self.obs_dim])
-            print(grid_obs)
-            time_horizon = tf.keras.layers.Input(shape=(), dtype=tf.int32)
+        if not hasattr(self, "tf_model"):
+            grid_obs = tf.keras.layers.Input(shape=[self.n_cells, self.obs_dim], batch_size=batch_size)
 
             self.build_MLPs()
-            
+
             if self.hidden_dim:
                 self.start_hidden_state = tf.Variable(tf.zeros((self.n_cells, self.hidden_dim)), dtype=tf.float32)
-            
-            preds = []
 
-            batch_size = tf.shape(grid_obs)[0]
+            preds = []
 
             if self.hidden_dim:
                 batch_cells = tf.concat([grid_obs, tf.tile(tf.expand_dims(self.start_hidden_state, 0), [batch_size, 1, 1])], -1)
@@ -99,9 +91,8 @@ class TF_Grid(Model):
                 batch_cells = grid_obs
             cells = tf.reshape(batch_cells, [batch_size * self.n_cells, self.state_dim])
 
-            for t in range(self.time_horizon):
-                effect_matrix = tf.stack(list(
-                    map(lambda cells: tf.nn.embedding_lookup(cells, self.effect_inds), tf.unstack(batch_cells))))
+            for t in range(time_horizon):
+                effect_matrix = tf.map_fn(lambda cells: tf.nn.embedding_lookup(cells, self.effect_inds), batch_cells)
                 effect_cells = tf.reshape(effect_matrix[:, 0], [batch_size * self.n_effects, self.state_dim])
                 effect_neighbors = tf.reshape(effect_matrix[:, 1], [batch_size * self.n_effects, self.state_dim])
 
@@ -115,9 +106,9 @@ class TF_Grid(Model):
                          [effect_cells, effect_neighbors], -1)
 
                 effects = self.effect_MLP(effect_in)
+
                 batch_effects = tf.reshape(effects, [batch_size, self.n_effects, self.effect_dim])
-                stack_tot_effects = tf.stack(list(
-                    map(lambda effects: tf.math.segment_sum(effects, self.effect_inds[0]), tf.unstack(batch_effects))))
+                stack_tot_effects = tf.map_fn(lambda effects: tf.math.segment_sum(effects, self.effect_inds[0]), batch_effects)
                 tot_effects = tf.reshape(stack_tot_effects, [batch_size * self.n_cells, self.effect_dim])
 
                 if self.apply_dotp_dim:
@@ -132,12 +123,11 @@ class TF_Grid(Model):
                 cells = self.apply_MLP(apply_in)
 
                 batch_cells = tf.reshape(cells, [batch_size, self.n_cells, self.state_dim])
-
                 preds.append(batch_cells[:, :, :self.obs_dim])
 
             preds = tf.stack(preds, 1)
 
-            self.tf_model = tf.keras.Model(inputs=[grid_obs, time_horizon], outputs=preds)
+            self.tf_model = tf.keras.Model(inputs=grid_obs, outputs=preds)
 
     def build_MLPs(self):
         if self.effect_dotp_dim:
@@ -168,11 +158,11 @@ class TF_Grid(Model):
         mlp = []
 
         for layer in range(len(hidden_sizes) + 1):
-            if layer == 0:
+            if layer == len(hidden_sizes):
+                mlp.append(tf.keras.layers.Dense(out_size))
+            elif layer == 0:
                 mlp.append(tf.keras.layers.Dense(hidden_sizes[0],
                     activation=activation, input_shape=[in_size]))
-            elif layer == len(hidden_sizes):
-                mlp.append(tf.keras.layers.Dense(out_size))
             else:
                 mlp.append(tf.keras.layers.Dense(hidden_sizes[layer],
                     activation=activation))
@@ -187,13 +177,13 @@ class TF_Grid(Model):
         return x
 
     def predict(self, inputs):
-        if not hasattr(self, 'A'):
+        if not hasattr(self, "A"):
             self.get_A()
 
-        if not hasattr(self, 'tf_model'):
+        if not hasattr(self, "tf_model"):
             self.build_tf_model()
 
-        pred = self.tf_model(inputs["grid_obs"], inputs["time_horizon"])
+        pred = self.tf_model(inputs["grid_obs"])
 
         return pred
 
@@ -204,6 +194,7 @@ class TF_Grid(Model):
         raise NotImplementedError
 
 if __name__ == '__main__':
+    
     from tf_grid_model import TF_Grid_Model_v1
 
     d = {
@@ -222,24 +213,32 @@ if __name__ == '__main__':
 
     grid = TF_Grid()
     grid.neighbor_rule = neighbor_rule
-    # grid.tf_grid_model = TF_Grid_Model_v1
-    # grid.hidden_dim = 1
-    # grid.time_horizon = 10
+    grid.build_tf_model(batch_size=3, time_horizon=8)
+    optimizer = tf.keras.optimizers.Adam(0.01)
+    
+    @tf.function
+    def f(): 
+        inputs = {"grid_obs": tf.constant([
+            [[0],[1],[2],[3],[4],[5],[6],[7],[8]],
+            [[10],[11],[12],[13],[14],[15],[16],[17],[18]],
+            [[20],[21],[22],[23],[24],[25],[26],[27],[28]]], dtype=tf.float32)}
+        # inputs = {"grid_obs": tf.constant([
+        #     [[0],[1],[2],[3],[4],[5],[6],[7],[8]],
+        #     [[0],[1],[2],[3],[4],[5],[6],[7],[8]],
+        #     [[0],[1],[2],[3],[4],[5],[6],[7],[8]]], dtype=tf.float32)}
 
-    inputs = {"grid_obs": tf.constant([
-        [[0],[1],[2],[3],[4],[5],[6],[7],[8]],
-        [[10],[11],[12],[13],[14],[15],[16],[17],[18]],
-        [[20],[21],[22],[23],[24],[25],[26],[27],[28]]], dtype=tf.float32),
-        "time_horizon": 2}
+        with tf.GradientTape() as grad_tape:
+            pred = grid.predict(inputs)
+            loss = tf.reduce_mean(tf.square(pred - 1))
+        gradients = grad_tape.gradient(loss, grid.tf_model.trainable_variables)
+        
+        optimizer.apply_gradients(zip(gradients, grid.tf_model.trainable_variables))
 
-    #with tf.GradientTape() as grad_tape:
-    #    pred = grid.predict(inputs)
-    #    loss = tf.linalg.norm(pred)
-    #gradients = grad_tape.gradient(loss, grid.tf_grid_model.trainable_variables)
+        return (loss, pred)
 
-    #print(list(grid.tf_grid_model.trainable_variables))
-
-    pred = grid.predict(inputs)
-    print(pred[0])
-    print(pred[1])
-    print(pred[2])
+    print(f()[1][:,0])
+    losses = []
+    for i in range(100):
+        losses.append(f()[0])
+    print(losses[::10])
+    print(f()[1][:,0])
