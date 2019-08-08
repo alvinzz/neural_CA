@@ -16,6 +16,91 @@ class TF_Grid(Model):
 
         self.neighbor_rule = None
 
+    def update_parameters(self):
+        self.params = {
+            "param_path": TF_Grid_v1.param_path,
+            "param_name": TF_Grid_v1.param_name,
+
+            "n_cells": self.n_cells,
+
+            "obs_dim": self.obs_dim,
+            "hidden_dim": self.hidden_dim,
+
+            "neighbor_rule": self.neighbor_rule,
+        }
+
+    # calculates adjacency matrix for the grid based on the Grid.neighbor_rule
+    def get_A(self):
+        if not hasattr(self, "A"):
+            self.A = np.zeros((self.n_cells, self.n_cells), dtype=np.int32)
+
+            for i in range(self.n_cells):
+                for j in range(self.n_cells):
+                    if self.neighbor_rule(i, j):
+                        self.A[i, j] = 1
+
+            self.effect_inds = np.array(np.nonzero(self.A))
+            self.n_effects = self.effect_inds.shape[1]
+
+    def build_tf_model(self, batch_size, time_horizon):
+        self.get_A()
+        raise NotImplementedError
+
+    def build_MLPs(self):
+        raise NotImplementedError
+
+    def create_MLP(self, in_size, out_size, hidden_sizes, activation):
+        mlp = []
+
+        for layer in range(len(hidden_sizes) + 1):
+            if layer == len(hidden_sizes):
+                mlp.append(tf.keras.layers.Dense(out_size))
+            elif layer == 0:
+                mlp.append(tf.keras.layers.Dense(hidden_sizes[0],
+                    activation=activation, input_shape=[in_size]))
+            else:
+                mlp.append(tf.keras.layers.Dense(hidden_sizes[layer],
+                    activation=activation))
+
+        mlp = tf.keras.Sequential(mlp)
+
+        return mlp
+
+    def MLP_forward(self, mlp, x):
+        for layer in mlp:
+            x = layer(x)
+        return x
+
+    def predict(self, inputs):
+        if not hasattr(self, "A"):
+            self.get_A()
+
+        if not hasattr(self, "tf_model"):
+            self.build_tf_model()
+
+        pred = self.tf_model(inputs["grid_obs"])
+
+        return pred
+
+    def visualize(self):
+        raise NotImplementedError
+
+    def visualize_n(self, n):
+        raise NotImplementedError
+
+class TF_Grid_v1(TF_Grid):
+    param_path = "neural_CA/tf_grid"
+    param_name = "TF_Grid_v1"
+
+    def __init__(self):
+        # grid parameters
+        self.n_cells = 9
+
+        self.obs_dim = 1
+        self.hidden_dim = 1
+
+        self.neighbor_rule = None
+
         # nn parameters
         self.effect_dotp_dim = 1
         self.effect_dotp_MLP_hidden_sizes = [20, 20]
@@ -35,8 +120,8 @@ class TF_Grid(Model):
 
     def update_parameters(self):
         self.params = {
-            "param_path": TF_Grid.param_path,
-            "param_name": TF_Grid.param_name,
+            "param_path": TF_Grid_v1.param_path,
+            "param_name": TF_Grid_v1.param_name,
 
             "n_cells": self.n_cells,
 
@@ -58,19 +143,6 @@ class TF_Grid(Model):
 
             "activation": self.activation,
         }
-
-    # calculates adjacency matrix for the grid based on the Grid.neighbor_rule
-    def get_A(self):
-        if not hasattr(self, "A"):
-            self.A = np.zeros((self.n_cells, self.n_cells), dtype=np.int32)
-
-            for i in range(self.n_cells):
-                for j in range(self.n_cells):
-                    if self.neighbor_rule(i, j):
-                        self.A[i, j] = 1
-
-            self.effect_inds = np.array(np.nonzero(self.A))
-            self.n_effects = self.effect_inds.shape[1]
 
     def build_tf_model(self, batch_size, time_horizon):
         self.get_A()
@@ -154,39 +226,6 @@ class TF_Grid(Model):
             self.state_dim + self.effect_dim + self.apply_dotp_dim, self.state_dim,
             self.apply_MLP_hidden_sizes, self.activation)
 
-    def create_MLP(self, in_size, out_size, hidden_sizes, activation):
-        mlp = []
-
-        for layer in range(len(hidden_sizes) + 1):
-            if layer == len(hidden_sizes):
-                mlp.append(tf.keras.layers.Dense(out_size))
-            elif layer == 0:
-                mlp.append(tf.keras.layers.Dense(hidden_sizes[0],
-                    activation=activation, input_shape=[in_size]))
-            else:
-                mlp.append(tf.keras.layers.Dense(hidden_sizes[layer],
-                    activation=activation))
-
-        mlp = tf.keras.Sequential(mlp)
-
-        return mlp
-
-    def MLP_forward(self, mlp, x):
-        for layer in mlp:
-            x = layer(x)
-        return x
-
-    def predict(self, inputs):
-        if not hasattr(self, "A"):
-            self.get_A()
-
-        if not hasattr(self, "tf_model"):
-            self.build_tf_model()
-
-        pred = self.tf_model(inputs["grid_obs"])
-
-        return pred
-
     def visualize(self):
         raise NotImplementedError
 
@@ -194,9 +233,6 @@ class TF_Grid(Model):
         raise NotImplementedError
 
 if __name__ == '__main__':
-    
-    from tf_grid_model import TF_Grid_Model_v1
-
     d = {
             0: [1, 3],
             1: [0, 2, 4],
@@ -211,7 +247,7 @@ if __name__ == '__main__':
     def neighbor_rule(i, j):
         return j in d[i]
 
-    grid = TF_Grid()
+    grid = TF_Grid_v1()
     grid.neighbor_rule = neighbor_rule
     grid.build_tf_model(batch_size=3, time_horizon=8)
     optimizer = tf.keras.optimizers.Adam(0.01)
