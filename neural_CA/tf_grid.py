@@ -198,17 +198,17 @@ class TF_Grid_v1(TF_Grid):
                 effects = self.effect_MLP(effect_in)
 
                 batch_effects = tf.reshape(effects, [batch_size, self.n_effects, self.effect_dim])
-                stack_tot_effects = tf.map_fn(lambda effects: tf.math.segment_sum(effects, self.effect_inds[0]), batch_effects)
-                tot_effects = tf.reshape(stack_tot_effects, [batch_size * self.n_cells, self.effect_dim])
+                tot_effect = tf.map_fn(lambda effects: tf.math.segment_sum(effects, self.effect_inds[0]), batch_effects)
+                tot_effect = tf.reshape(tot_effect, [batch_size * self.n_cells, self.effect_dim])
 
                 if self.apply_dotp_dim:
                     cell_apply_transform = self.cell_apply_transform_MLP(cells)
-                    effect_apply_transform = self.effect_apply_transform_MLP(tot_effects)
+                    effect_apply_transform = self.effect_apply_transform_MLP(tot_effect)
                     apply_in = tf.concat(
-                        [cells, tot_effects, cell_apply_transform * effect_apply_transform], -1)
+                        [cells, tot_effect, cell_apply_transform * effect_apply_transform], -1)
                 else:
                     apply_in = tf.concat(
-                        [cells, tot_effects], -1)
+                        [cells, tot_effect], -1)
 
                 cells = self.apply_MLP(apply_in)
                 batch_cells = tf.reshape(cells, [batch_size, self.n_cells, self.state_dim])
