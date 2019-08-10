@@ -49,16 +49,16 @@ class TF_Grid(Model):
 
             for i in range(self.n_cells):
                 for j in range(self.n_cells):
-                    if self.neighbor_rule(i, j):
+                    if self.neighbor_rule.is_neighbor(i, j):
                         self.A[i, j] = 1
 
             self.effect_inds = np.array(np.nonzero(self.A))
             self.n_effects = self.effect_inds.shape[1]
 
-    def visualize(self):
+    def visualize(self, grid_visualizer):
         raise NotImplementedError
 
-    def visualize_n(self, n):
+    def visualize_n(self, n, grid_layer_visualizer):
         raise NotImplementedError
 
 
@@ -201,10 +201,10 @@ class TF_Grid_v1(tf.keras.Model, TF_Grid):
     def predict(self, inputs):
         return self.__call__(inputs)
 
-    def visualize(self):
+    def visualize(self, grid_visualizer):
         raise NotImplementedError
 
-    def visualize_n(self, n):
+    def visualize_n(self, n, grid_layer_visualizer):
         raise NotImplementedError
 
     def build_MLPs(self):

@@ -6,7 +6,7 @@ class Grid(object):
     def __init__(self, n_cells):
         self.n_cells = n_cells
         self.A = np.zeros((self.n_cells, self.n_cells))
-        self.cells = [Cell()]
+        self.cells = []
 
         self.obs_dim = self.cells[0].obs_dim
         self.hidden_dim = self.cells[0].hidden_dim
@@ -19,6 +19,15 @@ class Grid(object):
             for j in self.A[i]:
                 if j:
                     cell.neighbors.append(self.cells[j])
+
+    def get_A(self, neighbor_rule):
+        # calculates adjacency matrix for the grid based on the neighbor_rule
+        self.A = np.zeros((self.n_cells, self.n_cells), dtype=np.int32)
+
+        for i in range(self.n_cells):
+            for j in range(self.n_cells):
+                if neighbor_rule.is_neighbor(i, j):
+                    self.A[i, j] = 1
 
     def get_A_from_cell_neighbors(self):
         self.A = np.zeros((self.n_cells, self.n_cells))
@@ -33,8 +42,8 @@ class Grid(object):
         for cell in self.cells:
             cell.update()
 
-    def visualize(self):
-        pass
+    def visualize(self, grid_visualizer):
+        raise NotImplementedError
 
-    def visualize_n(self, n):
-        pass
+    def visualize_n(self, n, grid_layer_visualizer):
+        raise NotImplementedError

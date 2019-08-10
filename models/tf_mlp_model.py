@@ -43,4 +43,7 @@ class TF_MLP_Model(Model):
             self.tf_model = tf.keras.Sequential(layers)
 
     def predict(self, inputs):
+        if not hasattr(self, 'tf_model'):
+            self.build_tf_model()
+
         return self.tf_model(inputs["feature"])
