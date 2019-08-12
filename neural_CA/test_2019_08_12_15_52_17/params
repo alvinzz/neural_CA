@@ -1,0 +1,77 @@
+{
+  "trainer": {
+    "train_time_horizon": 1,
+    "loss": {
+      "param_path": "trainers.tf_utils.losses",
+      "param_name": "TF_Grid_L1_Loss"
+    },
+    "optimizer": {
+      "epsilon": 1e-07,
+      "learning_rate": 0.0001,
+      "param_path": "trainers.tf_utils.optimizers",
+      "param_name": "TF_Adam_Optimizer"
+    },
+    "batch_size": 1,
+    "load_checkpoint_dir": null,
+    "start_epoch": 0,
+    "n_epochs": 20,
+    "log_period": 1,
+    "save_period": 20,
+    "param_path": "trainers.tf_grid_trainer",
+    "param_name": "TF_Grid_Trainer"
+  },
+  "evaluator": null,
+  "exp_name": "test_2019_08_12_15_52_17",
+  "neighbor_rule": {
+    "grid_radius": 5,
+    "param_path": "neural_CA.neighbor_rule",
+    "param_name": "Hex_Neighbor_Rule"
+  },
+  "obs_dim": 1,
+  "random_seed": 0,
+  "model": {
+    "apply_dotp_dim": 2,
+    "warmup_time": 1,
+    "apply_dotp_MLP_hidden_sizes": [],
+    "effect_dim": 1,
+    "effect_MLP_hidden_sizes": [],
+    "activation": "relu",
+    "effect_dotp_dim": 2,
+    "effect_dotp_MLP_hidden_sizes": [],
+    "apply_MLP_hidden_sizes": [
+      50,
+      50,
+      50,
+      50
+    ],
+    "model_hidden_dim": 0,
+    "param_path": "models.tf_grid_model",
+    "param_name": "TF_Grid_Model_v1"
+  },
+  "grid_visualizer": null,
+  "dataset_manager": {
+    "data_prefix": "data/xor",
+    "prefetch_buffer_size": 100,
+    "shuffle_buffer_size": 100,
+    "n_samples": 1000,
+    "grid": {
+      "cell_ruleset": {
+        "param_path": "neural_CA.cell_ruleset",
+        "param_name": "XOR_Cell_Ruleset"
+      },
+      "grid_hidden_dim": 0,
+      "param_path": "neural_CA.grid",
+      "param_name": "Grid"
+    },
+    "train_val_test_split": [
+      0.8,
+      0.1,
+      0.1
+    ],
+    "data_time_horizon": 10,
+    "param_path": "neural_CA.dataset_manager",
+    "param_name": "XOR_Dataset_Manager"
+  },
+  "param_path": "neural_CA.ca_experiment",
+  "param_name": "CA_Experiment"
+}

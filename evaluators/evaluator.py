@@ -5,34 +5,23 @@ class Evaluator(Parameter):
     param_name = "Evaluator"
 
     def __init__(self):
-        self.val_data_loc = None
-        self.test_data_loc = None
+        self.global_params = set([])
 
-    def update_parameters(self):
-        self.params = {
-            "param_path": Evaluator.param_path,
-            "param_name": Evaluator.param_name,
+        self.params = set([])
 
-            "val_data_loc": self.val_data_loc,
-            "test_data_loc": self.test_data_loc,
-        }
+        self.shared_params = set([
+            "exp_name",
+            "dataset_manager",
+        ])
 
-    def load_val_data(self):
-        if not hasattr(self, val_data):
-            print("TODO: implement load_val_data method for Evaluator")
-            raise NotImplementedError
+        for global_param in self.global_params:
+            setattr(self, global_param, None)
 
-    def load_test_data(self):
-        if not hasattr(self, test_data):
-            print("TODO: implement load_test_data method for Evaluator")
-            raise NotImplementedError
+        for param in self.params:
+            setattr(self, param, None)
 
     def val(self, model):
-        self.load_val_data()
-        print("TODO: implement val method for Evaluator")
         raise NotImplementedError
 
     def test(self, model):
-        self.load_test_data()
-        print("TODO: implement test method for Evaluator")
         raise NotImplementedError

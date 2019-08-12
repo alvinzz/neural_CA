@@ -5,22 +5,20 @@ class Trainer(Parameter):
     param_name = "Trainer"
 
     def __init__(self):
-        self.data_loc = None
+        self.global_params = set([])
 
-    def update_parameters(self):
-        self.params = {
-            "param_path": Trainer.param_path,
-            "param_name": Trainer.param_name,
+        self.params = set([])
 
-            "data_loc": self.data_loc,
-        }
+        self.shared_params = set([
+            "exp_name",
+            "dataset_manager",
+        ])
 
-    def load_data(self):
-        if not hasattr(self, data):
-            print("TODO: implement load_data method for Trainer")
-            raise NotImplementedError
+        for global_param in self.global_params:
+            setattr(self, global_param, None)
+
+        for param in self.params:
+            setattr(self, param, None)
 
     def train(self, model):
-        self.load_data()
-        print("TODO: implement train method for Trainer")
         raise NotImplementedError

@@ -1,49 +1,69 @@
 import numpy as np
 
-from cell import Cell
+from parameter import Parameter
 
-class Grid(object):
-    def __init__(self, n_cells):
-        self.n_cells = n_cells
-        self.A = np.zeros((self.n_cells, self.n_cells))
-        self.cells = []
+class Grid(Parameter):
+    param_path = "neural_CA.grid"
+    param_name = "Grid"
 
-        self.obs_dim = self.cells[0].obs_dim
-        self.hidden_dim = self.cells[0].hidden_dim
-        self.dim = self.obs_dim + self.hidden_dim
+    def __init__(self):
+        self.global_params = [
+            "grid_hidden_dim",
+        ]
+        self.params = [
+            "cell_ruleset",
+        ]
+        self.shared_params = [
+            "obs_dim",
 
-    def set_cell_neighbors(self):
+            "neighbor_rule",
+        ]
+
+        for global_param in self.global_params:
+            setattr(self, global_param, None)
+
+        for param in self.params:
+            setattr(self, param, None)
+
+    def _build(self):
+        self.state_dim = self.obs_dim + self.grid_hidden_dim
+        self.n_cells = self.neighbor_rule.n_cells
+        self.A = self.neighbor_rule.A
+
+        self.set_random_state()
+
+        self.cells_neighbors = []
         for i in range(self.n_cells):
-            cell = self.cells[i]
-            cell.neighbors = []
-            for j in self.A[i]:
-                if j:
-                    cell.neighbors.append(self.cells[j])
-
-    def get_A(self, neighbor_rule):
-        # calculates adjacency matrix for the grid based on the neighbor_rule
-        self.A = np.zeros((self.n_cells, self.n_cells), dtype=np.int32)
-
-        for i in range(self.n_cells):
+            cell_neighbors = []
             for j in range(self.n_cells):
-                if neighbor_rule.is_neighbor(i, j):
-                    self.A[i, j] = 1
+                if self.A[i, j]:
+                    cell_neighbors.append(j)
+            self.cells_neighbors.append(cell_neighbors)
 
-    def get_A_from_cell_neighbors(self):
-        self.A = np.zeros((self.n_cells, self.n_cells))
-        for i in range(self.n_cells):
-            cell = self.cells[i]
-            for j in cell.neighbors:
-                self.A[i, j] = 1
+    def set_random_state(self):
+        self.cell_states = np.array([self.cell_ruleset.random_state()
+            for _ in range(self.n_cells)])
+        self.next_cell_states = np.array([np.zeros(self.state_dim) for _ in range(self.n_cells)])
 
     def update(self):
-        for cell in self.cells:
-            cell.compute_next()
-        for cell in self.cells:
-            cell.update()
+        for i in range(self.n_cells):
+            cell_state = self.cell_states[i].copy()
+            neighbor_states = self.cell_states[self.cells_neighbors[i]].copy()
+            self.next_cell_states[i] = self.cell_ruleset.compute_next(cell_state, neighbor_states)
+
+        self.cell_states = self.next_cell_states.copy()
 
     def visualize(self, grid_visualizer):
-        raise NotImplementedError
+        state = self.get_state()
+        grid_visualizer.visualize(state, pause=True)
 
-    def visualize_n(self, n, grid_layer_visualizer):
-        raise NotImplementedError
+    def visualize_dim(self, dim, grid_layer_visualizer):
+        state = self.get_state()
+        layer_state = state[:, dim]
+        grid_layer_visualizer.visualize(state, pause=True)
+
+    def get_obs(self):
+        return np.expand_dims(self.cell_states[:, :self.obs_dim].astype(np.float32), 0)
+
+    def get_state(self):
+        return np.expand_dims(self.cell_states.astype(np.float32), 0)

@@ -5,14 +5,17 @@ class Model(Parameter):
     param_name = "Model"
 
     def __init__(self):
-        pass
+        self.global_params = set([])
 
-    def update_parameters(self):
-        self.params = {
-            "param_path": Model.param_path,
-            "param_name": Model.param_name,
-        }
+        self.params = set([])
+
+        self.shared_params = set([])
+
+        for global_param in self.global_params:
+            setattr(self, global_param, None)
+
+        for param in self.params:
+            setattr(self, param, None)
 
     def predict(self, inputs):
-        print("TODO: define predict method for Model")
         raise NotImplementedError
