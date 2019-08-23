@@ -117,15 +117,17 @@ class TF_Grid_Model_v1(tf.keras.Model, TF_Grid_Model):
         pred_time_horizon = inputs["pred_time_horizon"]
 
         # during warmup period, overwrite preds with gt (masked for valid) and update hidden state
+        # handle first timestep & init_hidden_state
         current_obs = warmup_obs[:, 0, :, :]
         current_hidden_state = tf.tile(
             tf.expand_dims(self.init_hidden_state, 0),
             [batch_size, 1, 1])
         batch_cells = tf.concat([current_obs, current_hidden_state], -1)
-        for t in tf.range(self.warmup_time):
-            if t >= 1:
-                current_obs = warmup_obs[:, t, :, :]
-                current_hidden_state = batch_cells[:, :, self.obs_dim:]
+        batch_cells = self.forward_step(batch_cells)
+        # handle remaining warmup timesteps
+        for t in tf.range(1, self.warmup_time):
+            current_obs = warmup_obs[:, t, :, :]
+            current_hidden_state = batch_cells[:, :, self.obs_dim:]
             batch_cells = tf.concat([current_obs, current_hidden_state], -1)
             batch_cells = self.forward_step(batch_cells)
 
