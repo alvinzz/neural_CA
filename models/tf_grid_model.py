@@ -115,50 +115,12 @@ class TF_Grid_Model_v1(tf.keras.Model, TF_Grid_Model):
         warmup_obs = inputs["warmup_obs"] # [batch_size, warmup_time, n_cells, obs_dim]
         # TODO: add valid mask
         pred_time_horizon = inputs["pred_time_horizon"]
-        batch_size = tf.shape(warmup_obs)[0]
-
-        # forward step for the grid state
-        def forward_step(self, batch_cells):
-            cells = tf.reshape(batch_cells, [batch_size * self.n_cells, self.state_dim])
-
-            effect_matrix = tf.map_fn(lambda cells: tf.nn.embedding_lookup(cells, self.effect_inds), batch_cells)
-            effect_cells = tf.reshape(effect_matrix[:, 0], [batch_size * self.n_effects, self.state_dim])
-            effect_neighbors = tf.reshape(effect_matrix[:, 1], [batch_size * self.n_effects, self.state_dim])
-
-            if self.effect_dotp_dim:
-                 cell_effect_transform = self.cell_effect_transform_MLP(effect_cells)
-                 neighbor_effect_transform = self.neighbor_effect_transform_MLP(effect_neighbors)
-                 effect_in = tf.concat(
-                     [effect_cells, effect_neighbors, cell_effect_transform * neighbor_effect_transform], -1)
-            else:
-                 effect_in = tf.concat(
-                     [effect_cells, effect_neighbors], -1)
-
-            effects = self.effect_MLP(effect_in)
-
-            batch_effects = tf.reshape(effects, [batch_size, self.n_effects, self.effect_dim])
-            tot_effect = tf.map_fn(lambda effects: tf.math.segment_sum(effects, self.effect_inds[0]), batch_effects)
-            tot_effect = tf.reshape(tot_effect, [batch_size * self.n_cells, self.effect_dim])
-
-            if self.apply_dotp_dim:
-                cell_apply_transform = self.cell_apply_transform_MLP(cells)
-                effect_apply_transform = self.effect_apply_transform_MLP(tot_effect)
-                apply_in = tf.concat(
-                    [cells, tot_effect, cell_apply_transform * effect_apply_transform], -1)
-            else:
-                apply_in = tf.concat(
-                    [cells, tot_effect], -1)
-
-            cells = self.apply_MLP(apply_in)
-            batch_cells = tf.reshape(cells, [batch_size, self.n_cells, self.state_dim])
-
-            return batch_cells
 
         # during warmup period, overwrite preds with gt (masked for valid) and update hidden state
-        current_obs = warmup_obs[:, 0, :, :]
-        current_hidden_state = tf.tile(
-            tf.expand_dims(self.init_hidden_state, 0),
-            [batch_size, 1, 1])
+        # current_obs = warmup_obs[:, 0, :, :]
+        # current_hidden_state = tf.tile(
+        #     tf.expand_dims(self.init_hidden_state, 0),
+        #     [batch_size, 1, 1])
         batch_cells = tf.concat([current_obs, current_hidden_state], -1)
         for t in tf.range(self.warmup_time):
             current_obs = warmup_obs[:, t, :, :]
@@ -169,13 +131,13 @@ class TF_Grid_Model_v1(tf.keras.Model, TF_Grid_Model):
             else:
                 current_hidden_state = batch_cells[:, :, self.obs_dim:]
             batch_cells = tf.concat([current_obs, current_hidden_state], -1)
-            batch_cells = forward_step(batch_cells)
+            batch_cells = self.forward_step(batch_cells)
 
         # compute and store predictions
         preds = tf.TensorArray(tf.float32, pred_time_horizon, 
             dynamic_size=False, tensor_array_name="preds", infer_shape=True)
         for t in tf.range(pred_time_horizon):
-            batch_cells = forward_step(batch_cells)
+            batch_cells = self.forward_step(batch_cells)
             preds = preds.write(t, batch_cells[:, :, :self.obs_dim])
 
         preds = preds.stack()
@@ -211,3 +173,40 @@ class TF_Grid_Model_v1(tf.keras.Model, TF_Grid_Model):
         self.apply_MLP = create_MLP(
             self.state_dim + self.effect_dim + self.apply_dotp_dim, self.state_dim,
             self.apply_MLP_hidden_sizes, self.activation)
+
+    def forward_step(self, batch_cells):
+        batch_size = tf.shape(batch_cells)[0]
+        cells = tf.reshape(batch_cells, [batch_size * self.n_cells, self.state_dim])
+
+        effect_matrix = tf.map_fn(lambda cells: tf.nn.embedding_lookup(cells, self.effect_inds), batch_cells)
+        effect_cells = tf.reshape(effect_matrix[:, 0], [batch_size * self.n_effects, self.state_dim])
+        effect_neighbors = tf.reshape(effect_matrix[:, 1], [batch_size * self.n_effects, self.state_dim])
+
+        if self.effect_dotp_dim:
+             cell_effect_transform = self.cell_effect_transform_MLP(effect_cells)
+             neighbor_effect_transform = self.neighbor_effect_transform_MLP(effect_neighbors)
+             effect_in = tf.concat(
+                 [effect_cells, effect_neighbors, cell_effect_transform * neighbor_effect_transform], -1)
+        else:
+             effect_in = tf.concat(
+                 [effect_cells, effect_neighbors], -1)
+
+        effects = self.effect_MLP(effect_in)
+
+        batch_effects = tf.reshape(effects, [batch_size, self.n_effects, self.effect_dim])
+        tot_effect = tf.map_fn(lambda effects: tf.math.segment_sum(effects, self.effect_inds[0]), batch_effects)
+        tot_effect = tf.reshape(tot_effect, [batch_size * self.n_cells, self.effect_dim])
+
+        if self.apply_dotp_dim:
+            cell_apply_transform = self.cell_apply_transform_MLP(cells)
+            effect_apply_transform = self.effect_apply_transform_MLP(tot_effect)
+            apply_in = tf.concat(
+                [cells, tot_effect, cell_apply_transform * effect_apply_transform], -1)
+        else:
+            apply_in = tf.concat(
+                [cells, tot_effect], -1)
+
+        cells = self.apply_MLP(apply_in)
+        batch_cells = tf.reshape(cells, [batch_size, self.n_cells, self.state_dim])
+
+        return batch_cells
