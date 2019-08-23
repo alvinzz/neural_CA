@@ -156,6 +156,11 @@ class TF_Grid_Model_v1(tf.keras.Model, TF_Grid_Model):
             return batch_cells
 
         # during warmup period, overwrite preds with gt (masked for valid) and update hidden state
+        current_obs = warmup_obs[:, 0, :, :]
+        current_hidden_state = tf.tile(
+            tf.expand_dims(self.init_hidden_state, 0),
+            [batch_size, 1, 1])
+        batch_cells = tf.concat([current_obs, current_hidden_state], -1)
         for t in tf.range(self.warmup_time):
             current_obs = warmup_obs[:, t, :, :]
             if t == 0:
