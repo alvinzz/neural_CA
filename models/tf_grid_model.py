@@ -115,6 +115,7 @@ class TF_Grid_Model_v1(tf.keras.Model, TF_Grid_Model):
         warmup_obs = inputs["warmup_obs"] # [batch_size, warmup_time, n_cells, obs_dim]
         # TODO: add valid mask
         pred_time_horizon = inputs["pred_time_horizon"]
+        batch_size = tf.shape(warmup_obs)[0]
 
         # during warmup period, overwrite preds with gt (masked for valid) and update hidden state
         # handle first timestep & init_hidden_state
