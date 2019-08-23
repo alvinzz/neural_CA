@@ -10,16 +10,16 @@ class TF_Grid_Model(Model):
     param_name = "TF_Grid_Model"
 
     def __init__(self):
-        self.global_params = set([])
+        self.global_params = []
 
-        self.params = set([
+        self.params = [
             "model_hidden_dim",
             "warmup_time",
-        ])
+        ]
 
-        self.shared_params = set([
+        self.shared_params = [
             "neighbor_rule",
-        ])
+        ]
 
         for global_param in self.global_params:
             setattr(self, global_param, None)
@@ -55,9 +55,9 @@ class TF_Grid_Model_v1(tf.keras.Model, TF_Grid_Model):
     def __init__(self):
         super(TF_Grid_Model_v1, self).__init__()
 
-        self.global_params = set([])
+        self.global_params = []
 
-        self.params = set([
+        self.params = [
             "model_hidden_dim",
             "warmup_time",
             "effect_dotp_dim",
@@ -68,12 +68,12 @@ class TF_Grid_Model_v1(tf.keras.Model, TF_Grid_Model):
             "apply_dotp_MLP_hidden_sizes",
             "apply_MLP_hidden_sizes",
             "activation",
-        ])
+        ]
 
-        self.shared_params = set([
+        self.shared_params = [
             "obs_dim",
             "neighbor_rule",
-        ])
+        ]
 
         for global_param in self.global_params:
             setattr(self, global_param, None)
@@ -113,24 +113,15 @@ class TF_Grid_Model_v1(tf.keras.Model, TF_Grid_Model):
             apply_dotp = apply_cell_transform (*) apply_effect_transform
             cell.state = MLP(cell.state, tot_effect, apply_dotp)
         """
-        start_obs = inputs["warmup_obs"] # [batch, warmup_time, n_cells, obs_dim]
+        warmup_obs = inputs["warmup_obs"] # [batch_size, warmup_time, n_cells, obs_dim]
+        # TODO: add valid mask
         pred_time_horizon = inputs["pred_time_horizon"]
-        batch_size = tf.shape(start_obs)[0]
+        batch_size = tf.shape(warmup_obs)[0]
 
-        preds = tf.TensorArray(tf.float32, pred_time_horizon, 
-            dynamic_size=False, tensor_array_name="preds", infer_shape=True)
+        # forward step for the grid state
+        def forward_step(self, batch_cells):
+            cells = tf.reshape(batch_cells, [batch_size * self.n_cells, self.state_dim])
 
-        #TODO: fix
-        start_obs = start_obs[:, 0, :, :]
-
-        if self.model_hidden_dim:
-            batch_cells = tf.concat([start_obs, 
-                tf.tile(tf.expand_dims(self.init_hidden_state, 0), [batch_size, 1, 1])], -1)
-        else:
-            batch_cells = start_obs
-        cells = tf.reshape(batch_cells, [batch_size * self.n_cells, self.state_dim])
-
-        for t in tf.range(pred_time_horizon):
             effect_matrix = tf.map_fn(lambda cells: tf.nn.embedding_lookup(cells, self.effect_inds), batch_cells)
             effect_cells = tf.reshape(effect_matrix[:, 0], [batch_size * self.n_effects, self.state_dim])
             effect_neighbors = tf.reshape(effect_matrix[:, 1], [batch_size * self.n_effects, self.state_dim])
@@ -162,10 +153,32 @@ class TF_Grid_Model_v1(tf.keras.Model, TF_Grid_Model):
             cells = self.apply_MLP(apply_in)
             batch_cells = tf.reshape(cells, [batch_size, self.n_cells, self.state_dim])
 
+            return batch_cells
+
+        # during warmup period, overwrite preds with gt (masked for valid) and update hidden state
+        current_hidden_state = self.init_hidden_state
+        for t in tf.range(self.warmup_time):
+            current_obs = warmup_obs[:, t, :, :]
+
+            if self.model_hidden_dim:
+                batch_cells = tf.concat([current_obs, 
+                    tf.tile(tf.expand_dims(current_hidden_state, 0), [batch_size, 1, 1])], -1)
+            else:
+                batch_cells = current_obs
+
+            batch_cells = forward_step(batch_cells)
+
+            current_hidden_state = batch_cells[:, :, self.obs_dim:]
+
+        # compute and store predictions
+        preds = tf.TensorArray(tf.float32, pred_time_horizon, 
+            dynamic_size=False, tensor_array_name="preds", infer_shape=True)
+        for t in tf.range(pred_time_horizon):
+            batch_cells = forward_step(batch_cells)
             preds = preds.write(t, batch_cells[:, :, :self.obs_dim])
 
         preds = preds.stack()
-        preds = tf.transpose(preds, [1, 0, 2, 3])
+        preds = tf.transpose(preds, [1, 0, 2, 3]) # [batch_size, pred_time_horizon, n_cells, obs_dim]
 
         return preds
 

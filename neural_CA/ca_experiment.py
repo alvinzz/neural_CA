@@ -82,13 +82,13 @@ if __name__ == "__main__":
             optimizer.learning_rate = 0.0001
             optimizer.epsilon = 1e-7
         trainer.optimizer = optimizer
-        trainer.load_checkpoint_dir = "test_2019_08_12_15_52_17/"
-        trainer.start_epoch = 20
+        trainer.load_checkpoint_dir = None
+        trainer.start_epoch = 0
         trainer.n_epochs = 20
         trainer.batch_size = 1
         trainer.log_period = 1
         trainer.save_period = 20
-        trainer.train_time_horizon = 2
+        trainer.train_time_horizon = 1
     ca_exp.trainer = trainer
     ca_exp.evaluator = None
     if True:
