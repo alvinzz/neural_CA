@@ -89,10 +89,9 @@ class TF_Grid_Model_v1(tf.keras.Model, TF_Grid_Model):
         self.get_effect_inds()
 
         self.build_MLPs()
-        if self.model_hidden_dim:
-            self.init_hidden_state = tf.Variable(
-                tf.zeros([self.n_cells, self.model_hidden_dim]),
-                dtype=tf.float32, trainable=True, name="init_hidden")
+        self.init_hidden_state = tf.Variable(
+            tf.zeros([self.n_cells, self.model_hidden_dim]),
+            dtype=tf.float32, trainable=True, name="init_hidden")
 
     def call(self, inputs):
         """
