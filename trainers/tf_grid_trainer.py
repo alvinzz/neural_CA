@@ -11,13 +11,13 @@ class TF_Grid_Trainer(Trainer):
 
     def __init__(self):
         self.global_params = [
-            "train_time_horizon"
+            "pred_time_horizon"
         ]
 
         self.params = [
             "loss",
             "optimizer",
-            
+
             "batch_size",
 
             "load_checkpoint_dir",
@@ -31,11 +31,11 @@ class TF_Grid_Trainer(Trainer):
 
         self.shared_params = [
             "exp_name",
-            
+
             "random_seed",
-            
+
             "dataset_manager",
-            
+
             "model",
         ]
 
@@ -46,7 +46,7 @@ class TF_Grid_Trainer(Trainer):
             setattr(self, param, None)
 
     def _build(self):
-        self.data = self.dataset_manager.load_data("train", self.batch_size, self.model.warmup_time, self.train_time_horizon)
+        self.data = self.dataset_manager.load_data("train", self.batch_size, self.model.warmup_time, self.pred_time_horizon)
 
         if not self.load_checkpoint_dir:
             assert self.start_epoch == 0, "If not loading from checkpoint, start_epoch should be 0"

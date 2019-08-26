@@ -58,7 +58,7 @@ class TF_Grid_MSE_Loss(TF_Loss):
         ]
 
         self.shared_params = [
-            "train_time_horizon",
+            "pred_time_horizon",
         ]
 
         for global_param in self.global_params:
@@ -68,9 +68,9 @@ class TF_Grid_MSE_Loss(TF_Loss):
             setattr(self, param, None)
 
     def _build(self):
-        self.weight_tensor = tf.constant(self.discount ** np.arange(self.train_time_horizon), dtype=tf.float32)
+        self.weight_tensor = tf.constant(self.discount ** np.arange(self.pred_time_horizon), dtype=tf.float32)
         self.weight_tensor /= tf.reduce_sum(self.weight_tensor)
-        self.weight_tensor = tf.reshape(self.weight_tensor, [1, self.train_time_horizon, 1, 1])
+        self.weight_tensor = tf.reshape(self.weight_tensor, [1, self.pred_time_horizon, 1, 1])
 
     def get_loss(self, data_batch, model_pred):
         squared_errors = tf.square(data_batch["pred_gt"] - model_pred)
@@ -92,7 +92,7 @@ class TF_Grid_L1_Loss(TF_Loss):
         ]
 
         self.shared_params = [
-            "train_time_horizon",
+            "pred_time_horizon",
         ]
 
         for global_param in self.global_params:
@@ -102,9 +102,9 @@ class TF_Grid_L1_Loss(TF_Loss):
             setattr(self, param, None)
 
     def _build(self):
-        self.weight_tensor = tf.constant(self.discount ** np.arange(self.train_time_horizon), dtype=tf.float32)
+        self.weight_tensor = tf.constant(self.discount ** np.arange(self.pred_time_horizon), dtype=tf.float32)
         self.weight_tensor /= tf.reduce_sum(self.weight_tensor)
-        self.weight_tensor = tf.reshape(self.weight_tensor, [1, self.train_time_horizon, 1, 1])
+        self.weight_tensor = tf.reshape(self.weight_tensor, [1, self.pred_time_horizon, 1, 1])
 
     def get_loss(self, data_batch, model_pred):
         l1_errors = tf.abs(data_batch["pred_gt"] - model_pred)
