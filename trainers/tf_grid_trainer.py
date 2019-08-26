@@ -86,10 +86,10 @@ class TF_Grid_Trainer(Trainer):
 
     @tf.function
     def train_step(self, data_batch):
-        with tf.GradientTape() as grad_tape:
-            model_pred = self.model.predict(data_batch)
-            loss = self.loss.get_loss(data_batch, model_pred)
-        gradients = grad_tape.gradient(loss, self.model.trainable_variables)
+        model_pred = self.model.predict(data_batch)
+        loss = self.loss.get_loss(data_batch, model_pred)
+        print(self.model.trainable_variables)
+        gradients = tf.gradients(loss, self.model.trainable_variables)
 
         self.metrics["loss"].update_state(loss)
 

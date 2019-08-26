@@ -85,7 +85,7 @@ class TF_Grid_Model_v1(tf.keras.Model, TF_Grid_Model):
         self.A = self.neighbor_rule.A
         self.state_dim = self.obs_dim + self.model_hidden_dim
         self.n_cells = self.A.shape[0]
-        
+
         self.get_effect_inds()
 
         self.build_MLPs()
@@ -218,7 +218,9 @@ class Meta_TF_Grid_Model_v1(tf.keras.Model, TF_Grid_Model):
     def __init__(self):
         super(Meta_TF_Grid_Model_v1, self).__init__()
 
-        self.global_params = []
+        self.global_params = [
+            "pred_time_horizon",
+        ]
 
         self.params = [
             "model_hidden_dim",
@@ -245,13 +247,15 @@ class Meta_TF_Grid_Model_v1(tf.keras.Model, TF_Grid_Model):
         for param in self.params:
             setattr(self, param, None)
 
+        self.pred_time_horizon = 1
+
     def _build(self):
         assert self.warmup_time >= 2, "warmup_time for meta-learning model must be at least 2"
 
         self.A = self.neighbor_rule.A
         self.state_dim = self.obs_dim + self.model_hidden_dim
         self.n_cells = self.A.shape[0]
-        
+
         self.get_effect_inds()
 
         self.build_MLPs()
@@ -305,7 +309,7 @@ class Meta_TF_Grid_Model_v1(tf.keras.Model, TF_Grid_Model):
         print(grad)
 
         # compute and store predictions
-        preds = tf.TensorArray(tf.float32, pred_time_horizon, 
+        preds = tf.TensorArray(tf.float32, pred_time_horizon,
             dynamic_size=False, tensor_array_name="preds", infer_shape=True)
         for t in tf.range(pred_time_horizon):
             batch_cells = self.forward_step(batch_cells)

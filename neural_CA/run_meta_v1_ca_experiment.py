@@ -13,11 +13,11 @@ if True:
     neighbor_rule = Hex_Neighbor_Rule()
     neighbor_rule.grid_radius = 5
 ca_exp.neighbor_rule = neighbor_rule
-ca_exp.exp_name = "test"
+ca_exp.exp_name = "meta_v1"
 ca_exp.random_seed = 0
 if True:
-    from models.tf_grid_model import TF_Grid_Model_v1
-    model = TF_Grid_Model_v1()
+    from models.tf_grid_model import Meta_TF_Grid_Model_v1
+    model = Meta_TF_Grid_Model_v1()
     model.model_hidden_dim = 2
     model.effect_dotp_dim = 6
     model.effect_dotp_MLP_hidden_sizes = []
@@ -28,6 +28,11 @@ if True:
     model.apply_MLP_hidden_sizes = [100 for _ in range(5)]
     model.activation = "relu"
     model.warmup_time = 3
+    if True:
+        from trainers.tf_utils.losses import TF_Grid_L1_Loss
+        loss = TF_Grid_L1_Loss()
+        loss.discount = 0.5
+    model.inner_loss = loss
 ca_exp.model = model
 if True:
     from trainers.tf_grid_trainer import TF_Grid_Trainer
@@ -40,16 +45,16 @@ if True:
     if True:
         from trainers.tf_utils.optimizers import TF_Adam_Optimizer
         optimizer = TF_Adam_Optimizer()
-        optimizer.learning_rate = 0.00001
+        optimizer.learning_rate = 0.0001
         optimizer.epsilon = 1e-7
     trainer.optimizer = optimizer
-    trainer.load_checkpoint_dir = "test_2019_08_23_18_29_45/" #"test_2019_08_23_16_46_42/"
-    trainer.start_epoch = 1650
-    trainer.n_epochs = 1000
-    trainer.batch_size = 1000
+    trainer.load_checkpoint_dir = None
+    trainer.start_epoch = 0
+    trainer.n_epochs = 50
+    trainer.batch_size = 10
     trainer.log_period = 1
     trainer.save_period = 50
-    trainer.pred_time_horizon = 7
+    trainer.pred_time_horizon = 1
 ca_exp.trainer = trainer
 ca_exp.evaluator = None
 if True:
@@ -76,6 +81,6 @@ ca_exp.param_build()
 
 ca_exp.dataset_manager.create_dataset()
 
-ca_exp.save()
+#ca_exp.save()
 
 ca_exp.trainer.train()
